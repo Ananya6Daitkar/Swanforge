@@ -2,6 +2,8 @@
 
 An adversarial world model that discovers previously unseen cascading failures in an interconnected synthetic city and searches for the smallest intervention that prevents collapse.
 
+Live demo: [https://swanforge-black-swan.netlify.app](https://swanforge-black-swan.netlify.app)
+
 This is not conventional monitoring. Monitoring observes a deployed system and alerts on known conditions; Black Swan Forge executes a conditional city model, actively searches its failure space, minimizes causal counterexamples, and validates repairs by counterfactual replay.
 
 > **Scientific boundary:** This is a synthetic research prototype. It does not predict real cities. Dependencies and parameters are demonstrative. Its purpose is discovering failure hypotheses and testing methods. Real deployment would require validated infrastructure data and domain experts. Every result is **plausible under the assumptions of this model.**
@@ -44,6 +46,8 @@ npm run test:e2e
 ```
 
 ## Demo
+
+Production deployment: [https://swanforge-black-swan.netlify.app](https://swanforge-black-swan.netlify.app)
 
 Click **Run 90-Second Demo**. The accelerated scripted flow takes about 11 seconds in automated testing and retains eight concise presenter stages. It reveals authentication → payment → fuel → hospital propagation, minimizes the causal conditions, selects offline fuel authorization, and counterfactually verifies survival. See [Demo script](docs/DEMO_SCRIPT.md).
 
