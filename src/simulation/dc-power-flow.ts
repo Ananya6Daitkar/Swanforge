@@ -1,0 +1,20 @@
+import { z } from "zod";
+
+const schema=z.object({name:z.string(),sourceUrl:z.string().url(),baseMVA:z.number().positive(),slackBus:z.number().int(),buses:z.array(z.object({id:z.number().int(),loadMW:z.number().nonnegative(),generationMW:z.number().nonnegative()})),branches:z.array(z.object({from:z.number().int(),to:z.number().int(),x:z.number().positive()}))});
+export type PowerCase=z.infer<typeof schema>;
+export interface PowerFlowResult{angles:Record<number,number>;flows:{id:string;from:number;to:number;flowMW:number;limitMW:number;loading:number}[];outages:string[];unservedMW:number;iterations:number;}
+const id=(from:number,to:number)=>`${from}-${to}`;
+function solveLinear(a:number[][],b:number[]){const n=b.length,m=a.map((r,i)=>[...r,b[i]]);for(let p=0;p<n;p++){let best=p;for(let r=p+1;r<n;r++)if(Math.abs(m[r][p])>Math.abs(m[best][p]))best=r;[m[p],m[best]]=[m[best],m[p]];if(Math.abs(m[p][p])<1e-10)throw new Error("Disconnected power-flow island");for(let r=p+1;r<n;r++){const f=m[r][p]/m[p][p];for(let c=p;c<=n;c++)m[r][c]-=f*m[p][c]}}const x=Array(n).fill(0);for(let r=n-1;r>=0;r--){x[r]=(m[r][n]-m[r].slice(r+1,n).reduce((s,v,c)=>s+v*x[r+1+c],0))/m[r][r]}return x}
+function connected(caseData:PowerCase,outages:Set<string>){const seen=new Set<number>([caseData.slackBus]),queue=[caseData.slackBus];while(queue.length){const bus=queue.shift()!;for(const branch of caseData.branches){if(outages.has(id(branch.from,branch.to)))continue;const next=branch.from===bus?branch.to:branch.to===bus?branch.from:0;if(next&&!seen.has(next)){seen.add(next);queue.push(next)}}}return seen}
+export function dcPowerFlow(input:unknown,outageIds:string[]=[],limits?:Record<string,number>):PowerFlowResult{
+ const c=schema.parse(input),outages=new Set(outageIds),reachable=connected(c,outages),activeBuses=c.buses.filter(b=>reachable.has(b.id)),nonSlack=activeBuses.filter(b=>b.id!==c.slackBus),index=new Map(nonSlack.map((b,i)=>[b.id,i])),B=nonSlack.map(()=>nonSlack.map(()=>0));
+ for(const branch of c.branches){if(outages.has(id(branch.from,branch.to))||!reachable.has(branch.from)||!reachable.has(branch.to))continue;const y=1/branch.x,fi=index.get(branch.from),ti=index.get(branch.to);if(fi!==undefined)B[fi][fi]+=y;if(ti!==undefined)B[ti][ti]+=y;if(fi!==undefined&&ti!==undefined){B[fi][ti]-=y;B[ti][fi]-=y}}
+ const injection=nonSlack.map(bus=>(bus.generationMW-bus.loadMW)/c.baseMVA),theta=solveLinear(B,injection),angles:Record<number,number>={[c.slackBus]:0};nonSlack.forEach((b,i)=>angles[b.id]=theta[i]);
+ const flows=c.branches.filter(b=>!outages.has(id(b.from,b.to))&&reachable.has(b.from)&&reachable.has(b.to)).map(branch=>{const flowMW=(angles[branch.from]-angles[branch.to])/branch.x*c.baseMVA,limitMW=limits?.[id(branch.from,branch.to)]??Infinity;return{id:id(branch.from,branch.to),from:branch.from,to:branch.to,flowMW,limitMW,loading:Math.abs(flowMW)/limitMW}});
+ const unservedMW=c.buses.filter(b=>!reachable.has(b.id)).reduce((s,b)=>s+b.loadMW,0);return{angles,flows,outages:[...outages],unservedMW,iterations:1};
+}
+export function deriveExperimentalLimits(input:unknown,margin=1.25,floorMW=8){const base=dcPowerFlow(input),limits:Record<string,number>={};base.flows.forEach(f=>limits[f.id]=Math.abs(f.flowMW)*margin+floorMW);return limits}
+export function simulateGridCascade(input:unknown,initialOutage:string,margin=1.25):PowerFlowResult{
+ const limits=deriveExperimentalLimits(input,margin),outages=new Set([initialOutage]);let result=dcPowerFlow(input,[...outages],limits),iterations=1;while(iterations<10){const overloaded=result.flows.filter(f=>f.loading>1.0001).sort((a,b)=>b.loading-a.loading);if(!overloaded.length)break;overloaded.forEach(f=>outages.add(f.id));try{result=dcPowerFlow(input,[...outages],limits)}catch{break}iterations++}return{...result,outages:[...outages],iterations};
+}
+export function findWorstNMinusOne(input:unknown){const c=schema.parse(input);return c.branches.map(b=>simulateGridCascade(c,id(b.from,b.to))).sort((a,b)=>b.unservedMW-a.unservedMW||b.outages.length-a.outages.length)[0]}

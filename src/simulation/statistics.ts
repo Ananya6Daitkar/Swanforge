@@ -1,0 +1,4 @@
+import { runBaselineBenchmark } from "./experiments";
+export interface MultiSeedResult{seeds:number;budgetPerMethod:number;meanEvolutionary:number;meanRandom:number;meanImprovement:number;ci95:[number,number];wins:number;}
+const mean=(x:number[])=>x.reduce((a,b)=>a+b,0)/x.length;
+export function runMultiSeedBenchmark(seedCount=20,budget=60):MultiSeedResult{const ratios:number[]=[],evo:number[]=[],random:number[]=[];let wins=0;for(let i=0;i<seedCount;i++){const r=runBaselineBenchmark(1000+i*97,budget),e=r.find(x=>x.method==="Evolutionary")!.severeCascades,u=r.find(x=>x.method==="Uniform random")!.severeCascades;evo.push(e);random.push(u);const ratio=u?e/u:1;ratios.push(ratio);if(e>u)wins++}const m=mean(ratios),sd=Math.sqrt(ratios.reduce((s,x)=>s+(x-m)**2,0)/Math.max(1,ratios.length-1)),half=1.96*sd/Math.sqrt(ratios.length);return{seeds:seedCount,budgetPerMethod:budget,meanEvolutionary:mean(evo),meanRandom:mean(random),meanImprovement:m,ci95:[m-half,m+half],wins}}
