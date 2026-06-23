@@ -4,3 +4,11 @@ playwright-report
 test-results
 *.log
 .DS_Store
+.Rhistory
+BLACK_SWAN_FORGE_FINAL_SUBMISSION.zip
+BLACK_SWAN_FORGE_IMAGE_GALLERY_AND_VIDEO_SCRIPT.zip
+final-submission/
+final-submission 2/
+
+# Local Netlify folder
+.netlify
